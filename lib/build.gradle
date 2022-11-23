@@ -1,0 +1,103 @@
+plugins {
+    id 'groovy'
+    id 'maven-publish'
+    id 'signing'
+}
+
+apply from: "$rootDir/gradle/versioning.gradle"
+
+group = 'io.github.sogis'
+def myArtifactId = "mgdm2oereb"
+
+sourceCompatibility = '17'
+targetCompatibility = '17'
+
+compileJava {
+    options.compilerArgs.addAll(['--release', '17'])
+}
+
+repositories {
+    mavenCentral()
+    maven { url 'https://jars.interlis.ch/' }
+}
+
+/*
+configurations {
+    jar.archiveName = myArtifactId+"-lib-"+version+".jar"
+}
+*/
+
+configurations {
+    all*.exclude group: 'xml-apis'
+}
+
+dependencies {
+    implementation 'org.apache.groovy:groovy-all:4.0.5'
+
+    implementation 'org.slf4j:slf4j-api:1.7.36'
+    implementation 'net.sf.saxon:Saxon-HE:11.4' 
+    implementation 'ch.interlis:ilivalidator:1.12.1'
+    //compileOnly 'org.graalvm.sdk:graal-sdk:22.3.0'    
+    
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.7.2'
+    testImplementation 'org.slf4j:slf4j-simple:1.7.3'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+// Deploy library to maven central
+project.archivesBaseName = myArtifactId
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    baseName myArtifactId
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+javadoc.failOnError = false
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    baseName myArtifactId
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifact sourcesJar
+            artifact javadocJar
+            groupId = group
+            artifactId = myArtifactId
+
+            pom {
+                name = "mgdm2oereb"
+                url = "https://github.com/edigonzales/mgdm2oereb"
+                description = myArtifactId
+                scm {
+                    connection = "scm:git:https@github.com/edigonzales/mgdm2oereb"
+                    developerConnection = "scm:git:https@github.com/edigonzales/mgdm2oereb"
+                    url = "https://github.com/edigonzales/mgdm2oereb"
+                }
+                licenses {
+                    license {
+                        name = "MIT"
+                        url = "https://github.com/edigonzales/mgdm2oereb/blob/master/LICENSE"
+                    }
+                }
+                developers {
+                    developer {
+                        id = "edigonzales"
+                        name = "Stefan Ziegler"
+                    }
+                }
+            }
+        }
+    }
+}
+
+signing {
+    sign publishing.publications.mavenJava
+}
