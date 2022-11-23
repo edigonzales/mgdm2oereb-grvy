@@ -1,0 +1,25 @@
+plugins {
+    id 'groovy'
+    id 'application'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.apache.groovy:groovy-all:4.0.5'
+    
+    implementation 'com.google.guava:guava:31.0.1-jre'
+
+    testImplementation 'org.spockframework:spock-core:2.3-groovy-4.0'
+    testImplementation 'junit:junit:4.13.2'
+}
+
+application {
+    mainClass = 'ch.so.agi.mgdm2oereb.App'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
