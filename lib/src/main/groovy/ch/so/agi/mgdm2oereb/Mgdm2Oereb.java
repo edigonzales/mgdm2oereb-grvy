@@ -8,6 +8,8 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
@@ -102,61 +104,77 @@ public class Mgdm2Oereb {
     public boolean convert(String inputXtfFileName, String outputDirectory, Settings settings) throws Mgdm2OerebException {
         var outDirectory = new File(outputDirectory);
         
-        // Weil die öreblex-Optionen in einer Optionen-Gruppe sind, funktioniert die Prüfung auf eine einzelne
-        // Option. Die Gruppe selber ist optional aber innerhalb der Gruppe sind alle mandatory.
+        Map<String,String> params = new HashMap<String,String>();
+        params.put("theme_code", settings.getValue(Mgdm2Oereb.THEME_CODE));
+        params.put("model", settings.getValue(Mgdm2Oereb.MODEL));
+
+        var xsltFileName = settings.getValue(Mgdm2Oereb.MODEL) + ".trafo.xsl";
+
         boolean oereblex = false;
         if (settings.getValue(Mgdm2Oereb.OEREBLEX_HOST) != null) {
             oereblex = true;
+            xsltFileName = settings.getValue(Mgdm2Oereb.MODEL) + ".oereblex.trafo.xsl";
         }
         
-        String xslFileName = settings.getValue(Mgdm2Oereb.MODEL) + ".trafo.xsl";
+        
+        // Oereblex processing
         String oereblexXmlFileName = null;
         if (oereblex) {
-            xslFileName = settings.getValue(Mgdm2Oereb.MODEL) + ".oereblex.trafo.xsl";
-            oereblexXmlFileName = this.processOereblex(settings, outDirectory, inputXtfFileName);            
+           
+            //oereblexXmlFileName = this.processOereblex(settings, outDirectory, inputXtfFileName);           
+            
+//            dom = ET.parse(xtf_path)
+//                    xslt = ET.parse(geolink_list_trafo_path)
+//                    transform = ET.XSLT(xslt)
+//                    transformed = transform(dom, oereblex_host=ET.XSLT.strparam(oereb_lex_host))
+
+            try {
+                var oereblexFile = Paths.get(outputDirectory, "oereblex.xml").toFile();
+                
+                var geolinkXsltFileName = settings.getValue(Mgdm2Oereb.MODEL) + ".oereblex.geolink_list.xsl";
+                var geolinkXsltFile = Paths.get(outputDirectory, geolinkXsltFileName).toFile();
+                Util.loadFile("xsl/"+geolinkXsltFileName, geolinkXsltFile);
+                
+                params.put("oereblex_host", settings.getValue(Mgdm2Oereb.OEREBLEX_HOST));
+                params.put("oereblex_output", oereblexFile.getAbsolutePath());
+                
+                Xslt.transform(geolinkXsltFile, new File(inputXtfFileName), oereblexFile, params);
+                
+                OereblexDownloader.process(oereblexFile);
+                
+                
+                
+            } catch (IOException | SaxonApiException e) {
+                throw new Mgdm2OerebException(e.getMessage());
+            }
         }
         
         // Main xsl transformation
-        try {
-            var xslFile = Paths.get(outDirectory.getAbsolutePath(), xslFileName).toFile();
-            Util.loadFile("xsl/"+xslFileName, xslFile);
-            
-            var outputXtfFile = Paths.get(outDirectory.getAbsolutePath(), "OeREBKRMtrsfr_V2_0.xtf").toFile();
-
-            var catalogFileName = settings.getValue(Mgdm2Oereb.CATALOG);
-            var catalogFile = Paths.get(outDirectory.getAbsolutePath(), catalogFileName).toFile();
-            Util.loadFile("catalogs/"+catalogFileName, catalogFile);
-            
-            Processor proc = new Processor(false);
-            XsltCompiler comp = proc.newXsltCompiler();
-            XsltExecutable exp = comp.compile(new StreamSource(xslFile));
-            
-            XdmNode source = proc.newDocumentBuilder().build(new StreamSource(new File(inputXtfFileName)));
-            Serializer outXtf = proc.newSerializer(outputXtfFile);
-            XsltTransformer trans = exp.load();
-            trans.setInitialContextNode(source);
-            trans.setDestination(outXtf);
-            trans.setParameter(new QName("theme_code"), (XdmValue) XdmAtomicValue.makeAtomicValue(settings.getValue(Mgdm2Oereb.THEME_CODE)));
-            trans.setParameter(new QName("model"), (XdmValue) XdmAtomicValue.makeAtomicValue(settings.getValue(Mgdm2Oereb.MODEL)));        
-            trans.setParameter(new QName("catalog"), (XdmValue) XdmAtomicValue.makeAtomicValue(catalogFile.getAbsolutePath()));
-            if (oereblex) {
-                trans.setParameter(new QName("oereblex_host"), (XdmValue) XdmAtomicValue.makeAtomicValue(settings.getValue(Mgdm2Oereb.OEREBLEX_HOST)));
-                trans.setParameter(new QName("oereblex_output"), (XdmValue) XdmAtomicValue.makeAtomicValue(oereblexXmlFileName));
-            }
-            trans.transform();
-            trans.close();
-            
-            boolean validate = Boolean.parseBoolean(settings.getValue(Mgdm2Oereb.VALIDATE));
-            
-            if (validate) {
-                var iliSettings = new ch.ehi.basics.settings.Settings();
-                boolean valid = Validator.runValidation(outputXtfFile.getAbsolutePath(), iliSettings);
-                return valid;
-            }
-            
-        } catch (IOException | SaxonApiException e) {
-            throw new Mgdm2OerebException(e.getMessage());
-        }
+//        try {
+//            var xsltFile = Paths.get(outDirectory.getAbsolutePath(), xsltFileName).toFile();
+//            Util.loadFile("xsl/"+xsltFileName, xsltFile);
+//            
+//            var outputXtfFile = Paths.get(outDirectory.getAbsolutePath(), "OeREBKRMtrsfr_V2_0.xtf").toFile();
+//
+//            var catalogFileName = settings.getValue(Mgdm2Oereb.CATALOG);
+//            var catalogFile = Paths.get(outDirectory.getAbsolutePath(), catalogFileName).toFile();
+//            Util.loadFile("catalogs/"+catalogFileName, catalogFile);
+//                                    
+//            params.put("catalog", catalogFile.getAbsolutePath());
+//
+//            Xslt.transform(xsltFile, new File(inputXtfFileName), outputXtfFile, params);
+//            
+//            boolean validate = Boolean.parseBoolean(settings.getValue(Mgdm2Oereb.VALIDATE));
+//            
+//            if (validate) {
+//                var iliSettings = new ch.ehi.basics.settings.Settings();
+//                var valid = Validator.runValidation(outputXtfFile.getAbsolutePath(), iliSettings);
+//                return valid;
+//            }
+//            
+//        } catch (IOException | SaxonApiException e) {
+//            throw new Mgdm2OerebException(e.getMessage());
+//        }
         return true;
     } 
 
